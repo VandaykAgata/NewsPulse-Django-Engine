@@ -18,3 +18,5 @@ db_freeze.json
 *.log
 __pycache__/
 .venv/
+.env
+celerybeat-schedule
