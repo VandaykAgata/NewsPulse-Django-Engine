@@ -10,26 +10,15 @@ from django.conf import settings
 
 @receiver(m2m_changed, sender=PostCategory)
 def notify_subscribers(sender, instance, **kwargs):
-    # Убираем проверку на post_add, чтобы ловить ЛЮБОЕ добавление категории
     action = kwargs.get('action')
 
-    # Добавляем принты — они появятся в окне, где запущен runserver
     print(f"DEBUG: Сигнал сработал! Действие: {action}")
 
     if action == 'post_add':
-        # Получаем список email
-        subscribers = instance.category.all().values_list('subscribers__email', flat=True).distinct()
-
-        print(f"DEBUG: Найдено подписчиков: {len(subscribers)}")
-
-        if subscribers:
-            send_notifications_task.delay(
-                instance.preview(),
-                instance.pk,
-                instance.title,
-                list(subscribers)
-            )
-            print("DEBUG: Задача отправлена в Celery!")
+        # Мы просто передаем ID поста.
+        # Celery сам возьмет всё остальное из базы, когда начнет работу.
+        send_notifications_task.delay(instance.pk)
+        print(f"DEBUG: Задача для поста #{instance.pk} отправлена в Celery!")
 
 @receiver(post_save, sender=User)
 def welcome_email(sender, instance, created, **kwargs):

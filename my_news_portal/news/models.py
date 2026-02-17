@@ -79,7 +79,7 @@ class Post(models.Model):
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
         cache.delete(f'post-{self.pk}')
-        cache.clear()
+
 
 # --- 4. Модель PostCategory (Промежуточная таблица) ---
 class PostCategory(models.Model):
