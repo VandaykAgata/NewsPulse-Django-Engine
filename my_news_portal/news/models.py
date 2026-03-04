@@ -4,16 +4,17 @@ from django.db.models import Sum
 from django.urls import reverse
 from django.core.cache import cache
 from django.utils.translation import gettext_lazy as _
+from .ai_logic import analyze_article_ai
 
-# --- Константы для выбора типа поста ---
+# --- Константы ---
 ARTICLE = 'AR'
 NEWS = 'NW'
 TYPE_CHOICES = [
     (ARTICLE, _('Статья')),
-    (NEWS,_('Новость'))
+    (NEWS, _('Новость'))
 ]
 
-# --- 1. Модель Author ---
+
 class Author(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, verbose_name=_('User'))
     rating = models.IntegerField(default=0, verbose_name=_('Rating'))
@@ -28,24 +29,15 @@ class Author(models.Model):
     def __str__(self):
         return self.user.username
 
-    class Meta:
-        verbose_name = _('Автор')
-        verbose_name_plural = _('Авторы')
 
-
-# --- 2. Модель Category ---
 class Category(models.Model):
     name = models.CharField(max_length=100, unique=True, verbose_name=_('Category Name'))
     subscribers = models.ManyToManyField(User, related_name='categories', blank=True, verbose_name=_('Subscribers'))
 
-    class Meta:
-        verbose_name = _('Категория')
-        verbose_name_plural = _('Категории')
-
     def __str__(self):
         return self.name
 
-# --- 3. Модель Post ---
+
 class Post(models.Model):
     author = models.ForeignKey(Author, on_delete=models.CASCADE, verbose_name=_('Author'))
     post_type = models.CharField(max_length=2, choices=TYPE_CHOICES, default=ARTICLE, verbose_name=_('Type'))
@@ -55,17 +47,20 @@ class Post(models.Model):
     text = models.TextField(verbose_name=_('Text'))
     rating = models.IntegerField(default=0, verbose_name=_('Rating'))
 
+    def save(self, *args, **kwargs):
+        print(f"--- DEBUG: Saving post '{self.title}' ---")
+        if not self.ai_summary:
+            print("--- DEBUG: Calling AI... ---")
+            ai_data = analyze_article_ai(self.title, self.text)
+
+    # --- НОВЫЕ ПОЛЯ ДЛЯ ИИ ---
+    ai_summary = models.TextField(blank=True, verbose_name=_('AI Summary'))
+    ai_sentiment = models.CharField(max_length=20, blank=True, verbose_name=_('AI Sentiment'))
+    ai_category_label = models.CharField(max_length=50, blank=True, verbose_name=_('AI Category'))
+
     class Meta:
         verbose_name = _('Пост')
         verbose_name_plural = _('Посты')
-
-    def like(self):
-        self.rating += 1
-        self.save()
-
-    def dislike(self):
-        self.rating -= 1
-        self.save()
 
     def preview(self):
         return f'{self.text[:124]}...'
@@ -76,47 +71,27 @@ class Post(models.Model):
     def get_absolute_url(self):
         return reverse('post_detail', args=[str(self.id)])
 
+    # --- УМНЫЙ МЕТОД SAVE ---
     def save(self, *args, **kwargs):
+        # Если это новый пост и поля ИИ пустые — запрашиваем анализ
+        if not self.ai_summary:
+            ai_data = analyze_article_ai(self.title, self.text)
+            self.ai_summary = ai_data.get('summary', '')
+            self.ai_sentiment = ai_data.get('sentiment', 'нейтральная')
+            self.ai_category_label = ai_data.get('category', 'другое')
+
         super().save(*args, **kwargs)
         cache.delete(f'post-{self.pk}')
 
 
-# --- 4. Модель PostCategory (Промежуточная таблица) ---
 class PostCategory(models.Model):
-    # Связь "один ко многим" с Post
     post = models.ForeignKey(Post, on_delete=models.CASCADE)
-    # Связь «один ко многим» с Category
     category = models.ForeignKey(Category, on_delete=models.CASCADE)
 
-# --- 5. Модель Comment ---
+
 class Comment(models.Model):
-    post = models.ForeignKey(Post, on_delete=models.CASCADE, verbose_name=_('Post'))
-    user = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name=_('User'))
-    text = models.TextField(verbose_name=_('Comment Text'))
-    time_in = models.DateTimeField(auto_now_add=True, verbose_name=_('Time Created'))
-    rating = models.IntegerField(default=0, verbose_name=_('Rating'))
-
-    class Meta:
-        verbose_name = _('Комментарий')
-        verbose_name_plural = _('Комментарии')
-
-    def like(self):
-        self.rating += 1
-        self.save()
-
-    def dislike(self):
-        self.rating -= 1
-        self.save()
-
-    def __str__(self):
-        return f'{self.user.username}:{self.text[:50]}...'
-
-class Article(models.Model):
-    title=models.CharField(max_length=200)
-    content=models.TextField()
-    pub_date=models.DateTimeField(auto_now_add=True)
-    def __str__(self):
-        return self.title
-
-
-
+    post = models.ForeignKey(Post, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    text = models.TextField()
+    time_in = models.DateTimeField(auto_now_add=True)
+    rating = models.IntegerField(default=0)

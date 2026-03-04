@@ -1,34 +1,51 @@
+{% extends "default.html" %}
 {% load censor %}
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <title>{{ post.title }}</title>
-</head>
-<body>
-    <div class="container">
-       <h1>{{ post.title|censor }}</h1>
-        <small>Тип: {{ post.post_type }}</small>
+{% load i18n %}
 
-        <hr>
+{% block content %}
+<div class="container">
+    <h1>{{ post.title|censor }}</h1>
+    <small>{% trans "Тип" %}: {{ post.get_post_type_display }}</small>
 
-        <p>
-            Автор: {{ post.author.user.username }} |
-            Дата: {{ post.time_in|date:"d M Y" }} |
-            Рейтинг: {{ post.rating }}
-        </p>
-        <p>Категории:
-            {% for category in post.category.all %}
-         <a href="{% url 'category_list' category.id %}">{{ category.name }}</a>
-            {% endfor %}
-        </p>
+    <hr>
 
-        <p>{{ post.text|censor }}</p>
+    <p>
+        {% trans "Автор" %}: {{ post.author.user.username }} |
+        {% trans "Дата" %}: {{ post.time_in|date:"d M Y" }} |
+        {% trans "Рейтинг" %}: {{ post.rating }}
+    </p>
 
-        <hr>
+    <p>{% trans "Категории" %}:
+        {% for category in post.category.all %}
+            <a href="{% url 'category_list' category.id %}">{{ category.name }}</a>
+        {% endfor %}
+    </p>
 
-        <p>
-            <a href="{% url 'post_list' %}">Вернуться к списку новостей</a>
-        </p>
+    <div style="font-size: 1.1em; line-height: 1.6; margin-bottom: 30px;">
+        {{ post.text|censor|linebreaks }}
     </div>
-</body>
-</html>
+
+    <section style="background: rgba(128, 128, 128, 0.1); padding: 20px; border-radius: 10px; border: 1px solid #ccc; margin: 20px 0;">
+        <h3 style="margin-top: 0;">🤖 {% trans "Анализ нейросети" %}</h3>
+
+        <p><strong>{% trans "Тональность" %}:</strong>
+            <span style="color: {% if post.ai_sentiment == 'позитивная' %}#28a745{% elif post.ai_sentiment == 'негативная' %}#dc3545{% else %}#6c757d{% endif %};">
+                {{ post.ai_sentiment }}
+            </span>
+        </p>
+
+        <p><strong>{% trans "Категория (ИИ)" %}:</strong> {{ post.ai_category_label }}</p>
+
+        <p><strong>{% trans "Краткое содержание" %}:</strong></p>
+        <blockquote style="font-style: italic; border-left: 4px solid #bb86fc; padding-left: 15px; margin-left: 0;">
+            {{ post.ai_summary }}
+        </blockquote>
+    </section>
+
+    <hr>
+
+    <p>
+        <a href="{% url 'post_list' %}">{% trans "Вернуться к списку новостей" %}</a>
+    </p>
+</div>
+{% endblock content %}

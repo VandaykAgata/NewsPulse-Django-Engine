@@ -3,10 +3,10 @@ import django
 import json
 import sys
 
-# 1. Помогаем Python найти папки твоего проекта
+# 1. Помогаем Python найти папки проекта
 sys.path.append(os.path.abspath(os.curdir))
 
-# 2. Указываем ПРАВИЛЬНОЕ имя папки с настройками (у тебя это NewsPaper)
+# 2. Указываем ПРАВИЛЬНОЕ имя папки с настройками
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'NewsPaper.settings')
 
 django.setup()
